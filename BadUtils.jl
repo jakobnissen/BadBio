@@ -1,3 +1,5 @@
+module BadUtils
+
 using DataStructures
 
 nested_dict(K::DataType=Any, V::DataType=Any) = DefaultDict{K, V}(nested_dict)
@@ -42,3 +44,5 @@ macro indir(directory, ex)
         val
     end
 end
+
+end # module

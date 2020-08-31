@@ -1,4 +1,4 @@
-module BadBio
+module BadSeq
 
 using BioSequences
 using FASTX
@@ -17,8 +17,8 @@ Base.getindex(x::NamedSeq, i::Integer) = x.seq[i]
 
 function Base.print(io::IO, s::NamedSeq)
     print(io, '>')
-    println(buf, s.name)
-    print(buf, s.seq)
+    println(io, s.name)
+    print(io, s.seq)
 end
 
 function Base.read(reader::FASTA.Reader, ::Type{NamedSeq})
@@ -26,20 +26,20 @@ function Base.read(reader::FASTA.Reader, ::Type{NamedSeq})
     header = FASTA.identifier(record)
     FASTA.hasdescription(record) && (header *= (" " * FASTA.description(record)))
     seq = FASTA.sequence(record)
-    return Seq(header, seq)
+    return NamedSeq(header, seq)
 end
 
 function read_fasta(io::IO)
     io = io isa FASTA.Reader ? io : FASTA.Reader(io)
     result = NamedSeq[]
     while !eof(io)
-        push!(result, read(io, Seq))
+        push!(result, read(io, NamedSeq))
     end
     result
 end
 
 macro seq_str(str, name)
-    :(Seq($(name), LongDNASeq($(str))))
+    :(NamedSeq($(name), LongDNASeq($(str))))
 end
 
 "MAFFT align sequences. By default prints a log to /tmp"
@@ -48,8 +48,7 @@ function mafft(seqs, stderr=tempname("/tmp"))
     
     open(inpath, "w") do file
         for seq in seqs
-            write(file, seq)
-            print(file, '\n')
+            println(file, seq)
         end
     end
     out = IOBuffer()
@@ -61,7 +60,7 @@ function mafft(seqs, stderr=tempname("/tmp"))
         run(pipeline(pipeline(`mafft $inpath`; stderr=stderr), out))
     end
     rm(inpath)
-    return readall(seekstart(out))
+    return read_fasta(seekstart(out))
 end
 
 "Trim '-' from both ends of an iterable of Seqs"
@@ -135,6 +134,62 @@ function findbest(gene::AminoAcidSeq, seq::LongSequence{<:NucleicAcidAlphabet})
 
     reversed = score_rv > score_fw
     return reversed, ifelse(reversed, orf_rv, orf_fw)
+end
+
+###########
+"Get all maximum-length orfs separated by a stop codon, if range satisfies f"
+function get_orfs(seq::BioSequence{<:NucleicAcidAlphabet})
+    orfs = UnitRange{Int}[]
+    for frame in 1:3
+        lastindex = length(seq) - (length(seq) - frame + 1) % 3
+        aas = translate(seq[frame:lastindex])
+        start = frame
+        local stop
+        for i in eachindex(aas)
+            index = 3*(i-1) + frame
+            if aas[i] == AA_Term
+                stop = index - 1
+                stop > start && push!(orfs, start:stop)
+                start = index + 3
+            end
+        end
+        stop > start && push!(orfs, start:stop)
+    end
+    return orfs
+end
+
+function get_met_orfs(seq::BioSequence{<:NucleicAcidAlphabet})
+    orfs = UnitRange{Int}[]
+    start = typemax(Int)
+    stop = 0
+    for frame in 1:3
+        lastindex = length(seq) - (length(seq) - frame + 1) % 3
+        aas = translate(seq[frame:lastindex])
+        for i in eachindex(aas)
+            index = 3*(i-1) + frame
+            if aas[i] == AA_Term
+                stop = index - 1
+                stop > start && push!(orfs, start:stop)
+                start = typemax(Int)
+            elseif (start == typemax(Int)) & (aas[i] == AA_M)
+                start = index
+            end
+        end
+        stop > start && push!(orfs, start:stop)
+    end
+    return orfs
+end
+
+longest(xs) = maximum(((length(i), i) for i in xs))[2]
+
+"Get (is_rc, largest ORF) in the sequence. `met` is whether it must start with Met"
+function largest_orf(sequence::BioSequence{<:NucleicAcidAlphabet}, met=false)
+    seq = copy(sequence)
+    f = ifelse(met, get_met_orfs, get_orfs)
+    fw = longest(f(seq))
+    rv = longest(f(reverse_complement!(seq)))
+    reversed = length(rv) > length(fw)
+    return reversed, ifelse(reversed, rv, fw)
 end
 
 end # module
