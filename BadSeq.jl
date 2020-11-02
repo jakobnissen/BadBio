@@ -144,7 +144,7 @@ function get_orfs(seq::BioSequence{<:NucleicAcidAlphabet})
         lastindex = length(seq) - (length(seq) - frame + 1) % 3
         aas = translate(seq[frame:lastindex])
         start = frame
-        local stop
+        local stop = 0
         for i in eachindex(aas)
             index = 3*(i-1) + frame
             if aas[i] == AA_Term
@@ -153,7 +153,8 @@ function get_orfs(seq::BioSequence{<:NucleicAcidAlphabet})
                 start = index + 3
             end
         end
-        stop > start && push!(orfs, start:stop)
+        # If no stop was detected at end.
+        start < lastindex && push!(orfs, start:lastindex)
     end
     return orfs
 end
@@ -190,6 +191,12 @@ function largest_orf(sequence::BioSequence{<:NucleicAcidAlphabet}, met=false)
     rv = longest(f(reverse_complement!(seq)))
     reversed = length(rv) > length(fw)
     return reversed, ifelse(reversed, rv, fw)
+end
+
+function largest_aa(sequence::BioSequence{<:NucleicAcidAlphabet}, met=false)
+    seq = copy(sequence)
+    isrv, orfrange = largest_orf(sequence, met)
+    return translate((isrv ? reverse_complement(sequence) : sequence)[orfrange])
 end
 
 end # module
