@@ -14,6 +14,7 @@ So do you write a package with this functionality? Of course not! Writing qualit
 * It's probably pretty slow, IDK.
 * It's not even a package. Like, you need to use `include`.
 * Blatantly ignores SemVer 2.0; will push breaking changes straight to master when you least expect it.
+* Pirates other packages' types with abandon
 
 ## Contributing
 Is this repo missing something? Make a PR, and i'll include it. Actually, I'll probably grant you write access to this repo. After all, this is all about making the least amount of effort.
