@@ -5,11 +5,7 @@ using DataStructures
 nested_dict(K::DataType=Any, V::DataType=Any) = DefaultDict{K, V}(nested_dict)
 
 function reversekv(dict::AbstractDict{K,V}) where {K,V}
-	vkdict = [x[2].=>x[1] for x in dict]
-    if typeof(dict) <: OrderedDict
-        return OrderedDict{V,K}(vkdict)
-    end
-	return Dict{V,K}(vkdict)
+    Base.typename(typeof(dict)).wrapper{V,K}(v => k for (k, v) in dict)
 end
 
 collectkeys(args) = keys(args) |> collect
