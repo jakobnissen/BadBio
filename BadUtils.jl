@@ -4,6 +4,13 @@ using DataStructures
 
 nested_dict(K::DataType=Any, V::DataType=Any) = DefaultDict{K, V}(nested_dict)
 
+function reversekv(dict::AbstractDict{K,V}) where {K,V}
+    Base.typename(typeof(dict)).wrapper{V,K}(v => k for (k, v) in dict)
+end
+
+collectkeys(args) = keys(args) |> collect
+collectvals(args) = values(args) |> collect
+
 """
     Path(s::String)
 
@@ -43,6 +50,60 @@ macro indir(directory, ex)
         cd(dir)
         val
     end
+end
+
+function tryint(number)
+    return (try
+        Int64(number)
+    catch
+        number
+    end)
+end
+function tryfloat(number)
+    return (try
+        Float64(number)
+    catch
+        number
+    end)
+end
+function tryfloat32(number)
+    return (try
+        Float32(number)
+    catch
+        number
+    end)
+end
+function unitrange(arr::AbstractVector{T}) where {T<:Int}
+    start_value = arr[1]
+    end_value = arr[end]
+    end_value == start_value && error("the start and end points are the same value")
+	end_value < start_value && error("the last value is lower than the first")
+    for i in 2:size(arr,1)
+        if arr[i]-arr[i-1] != 1
+            error("inconsistent step for unit range")
+        end
+    end
+    return UnitRange(start_value,end_value)
+end
+function steprange(arr::AbstractVector{T}) where {T<:Real}
+    start_value = arr[1]
+    end_value = arr[end]
+	start_value == end_value && error("the start and end points are the same value")
+    step = 1
+    for i in 2:size(arr,1)
+        if i == 2
+            step = arr[i]-arr[i-1]
+        end
+        if arr[i]-arr[i-1] != step
+            error("inconsistent step for step range")
+        end
+    end
+    return StepRangeLen(start_value,step,length(arr))
+end
+function varcall(name::String, body::Any)
+    name=Symbol(name)
+    @eval (($name) = ($body))
+	return Symbol(name)
 end
 
 end # module
